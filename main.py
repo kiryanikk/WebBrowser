@@ -1,24 +1,80 @@
 import sys
-from PyQt6.QtCore import QUrl, QSize
-from PyQt6.QtGui import QIcon
+import os
+from PyQt6.QtCore import QUrl, QSize, QPropertyAnimation, QEasingCurve, Qt
+from PyQt6.QtGui import QIcon, QColor
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QTabWidget, QToolBar, QPushButton,
     QLineEdit, QWidget, QVBoxLayout, QListWidget
 )
 from PyQt6.QtWebEngineWidgets import QWebEngineView
+from PyQt6.QtWebEngineCore import QWebEngineProfile, QWebEnginePage
 
+class AnimatedButton(QPushButton):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self._bg_color = QColor("transparent")
+        self._anim = QPropertyAnimation(self, b"bgColor")
+        self._anim.setDuration(500)
+        self._anim.setEasingCurve(QEasingCurve.Type.InOutQuad)
+
+    def enterEvent(self, event):
+        self.animate_to(QColor("#666"))
+        super().enterEvent(event)
+
+    def leaveEvent(self, event):
+        self.animate_to(QColor("transparent"))
+        super().leaveEvent(event)
+
+    def animate_to(self, color):
+        self._anim.stop()
+        self._anim.setStartValue(self._bg_color)
+        self._anim.setEndValue(color)
+        self._anim.start()
+
+    def get_bg(self):
+        return self._bg_color
+
+    def set_bg(self, color):
+        self._bg_color = color
+        self.setStyleSheet(f"""
+            background-color: {color.name()};
+            border-radius: 15px;
+        """)
+
+    bgColor = property(QColor, get_bg, set_bg)
 
 class MainWindow(QMainWindow):
-    HOME_URL = "http://www.google.com"
+    HOME_URL = "https://ya.ru/?utm_referrer=https%3A%2F%2Fwww.google.com%2F"
 
     def __init__(self):
         super().__init__()
+        self.resize(1200, 800)
         self.history = []
+
+        # Профиль клиента
+        base_dir = os.path.join(os.path.dirname(__file__), "data")
+        cache_dir = os.path.join(base_dir, "cache")
+        store_dir = os.path.join(base_dir, "storage")
+        os.makedirs(cache_dir, exist_ok=True)
+        os.makedirs(store_dir, exist_ok=True)
+
+        self.profile = QWebEngineProfile("MyBrowserProfile", self)
+        self.profile.setCachePath(cache_dir)
+        self.profile.setPersistentStoragePath(store_dir)
+        self.profile.setPersistentCookiesPolicy(
+            QWebEngineProfile.PersistentCookiesPolicy.ForcePersistentCookies
+        )
 
         # ---- Tabs ----
         self.tabs = QTabWidget()
+        self.tabs.setElideMode(Qt.TextElideMode.ElideRight)  # обрезать длинные заголовки "..."
+        self.tabs.setMovable(True)  # вкладки можно перетаскивать
         self.tabs.setDocumentMode(True)
-        self.tabs.setTabsClosable(True)  # крестики на вкладках
+        self.tabs.setTabsClosable(True)
+        self.tabs.setStyleSheet(self.tabs.styleSheet() + """
+        QTabBar::close-button { image: url(img/close.png); }
+        """)
         self.tabs.tabCloseRequested.connect(self.close_tab_by_index)
         self.tabs.currentChanged.connect(self.on_current_tab_changed)
         self.setCentralWidget(self.tabs)
@@ -28,27 +84,28 @@ class MainWindow(QMainWindow):
         self.addToolBar(self.navbar)
 
         # ---- Buttons ----
-        back_btn = QPushButton()
+
+        back_btn = AnimatedButton()
         back_btn.setIcon(QIcon("img/back.png"))
-        back_btn.setIconSize(QSize(24, 24))
+        back_btn.setIconSize(QSize(18, 18))
         back_btn.clicked.connect(self.go_back)
         self.navbar.addWidget(back_btn)
 
-        forward_btn = QPushButton()
+        forward_btn = AnimatedButton()
         forward_btn.setIcon(QIcon("img/forward.png"))
-        forward_btn.setIconSize(QSize(24, 24))
+        forward_btn.setIconSize(QSize(18, 18))
         forward_btn.clicked.connect(self.go_forward)
         self.navbar.addWidget(forward_btn)
 
-        reload_btn = QPushButton()
+        reload_btn = AnimatedButton()
         reload_btn.setIcon(QIcon("img/reload.png"))
-        reload_btn.setIconSize(QSize(24, 24))
+        reload_btn.setIconSize(QSize(18, 18))
         reload_btn.clicked.connect(self.reload_page)
         self.navbar.addWidget(reload_btn)
 
-        home_btn = QPushButton()
+        home_btn = AnimatedButton()
         home_btn.setIcon(QIcon("img/home.png"))
-        home_btn.setIconSize(QSize(24, 24))
+        home_btn.setIconSize(QSize(18, 18))
         home_btn.clicked.connect(self.go_home)
         self.navbar.addWidget(home_btn)
 
@@ -67,59 +124,10 @@ class MainWindow(QMainWindow):
         self.navbar.addWidget(history_btn)
 
         # ---- Styles (оставил твои) ----
-        btn_style = """
-            QPushButton {
-                border-radius: 5px;
-                background-color: #A9CCE3;
-                color: white;
-                font-size: 12px;
-                padding: 5px;
-                margin-right: 5px;
-            }
-            QPushButton:hover {
-                background-color: #B0E0E6;
-            }
-        """
-        back_btn.setStyleSheet(btn_style)
-        forward_btn.setStyleSheet(btn_style)
-        home_btn.setStyleSheet(btn_style)
-        reload_btn.setStyleSheet(btn_style)
-
-        newTab_btn.setStyleSheet("""
-            QPushButton {
-                border-radius: 5px;
-                background-color: #A9CCE3;
-                color: white;
-                font-size: 12px;
-                padding: 8px;
-                margin-right: 5px;
-                margin-left: 5px;
-            }
-        """)
-
-        history_btn.setStyleSheet("""
-            QPushButton {
-                border-radius: 5px;
-                background-color: #A9CCE3;
-                color: white;
-                font-size: 12px;
-                padding: 8px;
-                margin-right: 5px;
-            }
-        """)
-
-        self.url_bar.setStyleSheet("""
-            QLineEdit {
-                background-color: #A9CCE3;
-                border: 2px solid #A9CCE3;
-                border-radius: 5px;
-                padding: 5px;
-                font-size: 12px;
-            }
-        """)
 
         # ---- First tab ----
         self.add_new_tab(QUrl(self.HOME_URL))
+
 
     # =========================
     # Этап 2: add_new_tab
@@ -129,16 +137,39 @@ class MainWindow(QMainWindow):
             url = QUrl(self.HOME_URL)
 
         browser = QWebEngineView()
+
+        page = Page(self.profile, self)
+        browser.setPage(page)
+
+        browser.titleChanged.connect(
+            lambda title, b=browser: self.update_tab_title(b, title)
+        )
+        browser.urlChanged.connect(
+            lambda qurl, b=browser: self.on_url_changed(qurl, b)
+        )
+
         browser.setUrl(url)
-
-        # Заголовок вкладки
-        browser.titleChanged.connect(lambda title, b=browser: self.update_tab_title(b, title))
-
-        # URL и история
-        browser.urlChanged.connect(lambda qurl, b=browser: self.on_url_changed(qurl, b))
 
         index = self.tabs.addTab(browser, "Загрузка...")
         self.tabs.setCurrentIndex(index)
+
+    def createNewTab(self):
+        browser = QWebEngineView()
+
+        page = Page(self.profile, self)
+        browser.setPage(page)
+
+        browser.titleChanged.connect(
+            lambda title, b=browser: self.update_tab_title(b, title)
+        )
+        browser.urlChanged.connect(
+            lambda qurl, b=browser: self.on_url_changed(qurl, b)
+        )
+
+        index = self.tabs.addTab(browser, "Новая вкладка")
+        self.tabs.setCurrentIndex(index)
+
+        return page
 
     def update_tab_title(self, browser: QWebEngineView, title: str):
         index = self.tabs.indexOf(browser)
@@ -233,9 +264,160 @@ class MainWindow(QMainWindow):
         if self.tabs.count() > 1:
             self.tabs.removeTab(index)
 
+class Page(QWebEnginePage):
+    def __init__(self, profile, main_win):
+        super().__init__(profile, main_win)
+        self.main_win = main_win
+
+    def createWindow(self, win_type):
+        return self.main_win.createNewTab()
+
 
 if __name__ == '__main__':
+    StyleBrowser = """
+    /* ====== Base ====== */
+    QMainWindow {
+        background-color: #202124;
+    }
+
+    QWidget {
+        font-family: "Segoe UI";
+        font-size: 10.5pt;
+    }
+
+    /* ====== Toolbar (верхняя панель) ====== */
+    QToolBar {
+        background-color: #202124;
+        border: none;
+        padding: 6px;
+        spacing: 6px;
+    }
+
+    /* Кнопки на тулбаре (иконки + текстовые) */
+    QToolBar QPushButton {
+        background-color: transparent;
+        border: none;
+        border-radius: 12px;
+        padding: 6px 10px;
+        color: #E8EAED;
+    }
+
+    QToolBar QPushButton:hover {
+        background-color: #303134;
+    }
+
+    QToolBar QPushButton:pressed {
+        background-color: #3C4043;
+    }
+
+    /* Адресная строка - "pill" */
+    QToolBar QLineEdit {
+        background-color: #303134;
+        border: 1px solid #303134;
+        border-radius: 18px;
+        padding: 8px 12px;
+        color: #E8EAED;
+        selection-background-color: #8AB4F8;
+        selection-color: #202124;
+        min-width: 420px;
+    }
+
+    QToolBar QLineEdit:focus {
+        border: 1px solid #8AB4F8;
+    }
+
+    /* ====== Tabs ====== */
+    QTabWidget::pane {
+        border: none;
+        background: #202124;
+    }
+
+    /* Полоса вкладок */
+    QTabBar {
+        background: #202124;
+    }
+
+    QTabBar::tab {
+        background: #202124;
+        color: #BDC1C6;
+        padding: 8px 14px;
+        margin-right: 4px;
+        border-top-left-radius: 10px;
+        border-top-right-radius: 10px;
+        min-width: 140px;
+        max-width: 220px;
+    }
+
+    QTabBar::tab:hover {
+        background: #2A2B2E;
+        color: #E8EAED;
+    }
+
+    QTabBar::tab:selected {
+        background: #303134;
+        color: #E8EAED;
+    }
+
+    /* Крестик вкладки */
+    QTabBar::close-button {
+        image: none; /* чтобы не было системной иконки */
+        border: none;
+        border-radius: 8px;
+        min-width: 16px;
+        min-height: 16px;
+        margin-left: 8px;
+    }
+
+    QTabBar::close-button:hover {
+        background: #3C4043;
+    }
+
+    /* Кнопка закрытия — рисуем "x" текстом (Qt не умеет text тут),
+       поэтому оставляем как hover-area; если хочешь иконку — дам вариант ниже. */
+
+    /* ====== Scrollbar (чуть ближе к Chrome) ====== */
+    QScrollBar:vertical {
+        background: #202124;
+        width: 12px;
+        margin: 0px;
+    }
+    QScrollBar::handle:vertical {
+        background: #3C4043;
+        border-radius: 6px;
+        min-height: 24px;
+    }
+    QScrollBar::handle:vertical:hover {
+        background: #5F6368;
+    }
+    QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+        height: 0px;
+    }
+    QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
+        background: none;
+    }
+
+    QScrollBar:horizontal {
+        background: #202124;
+        height: 12px;
+        margin: 0px;
+    }
+    QScrollBar::handle:horizontal {
+        background: #3C4043;
+        border-radius: 6px;
+        min-width: 24px;
+    }
+    QScrollBar::handle:horizontal:hover {
+        background: #5F6368;
+    }
+    QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {
+        width: 0px;
+    }
+    QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal {
+        background: none;
+    }
+    """
     app = QApplication(sys.argv)
+    app.setStyleSheet(StyleBrowser)
     window = MainWindow()
     window.show()
     sys.exit(app.exec())
