@@ -4,7 +4,7 @@ from PyQt6.QtCore import QUrl, QSize, QPropertyAnimation, QEasingCurve, Qt
 from PyQt6.QtGui import QIcon, QColor
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QTabWidget, QToolBar, QPushButton,
-    QLineEdit, QWidget, QVBoxLayout, QListWidget, QTabBar
+    QLineEdit, QWidget, QVBoxLayout, QListWidget, QTabBar, QHBoxLayout
 )
 from PyQt6.QtWebEngineWidgets import QWebEngineView
 from PyQt6.QtWebEngineCore import QWebEngineProfile, QWebEnginePage
@@ -12,6 +12,7 @@ from PyQt6.QtWebEngineCore import QWebEngineProfile, QWebEnginePage
 class AnimatedButton(QPushButton):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.setWindowIcon(QIcon("img/app.ico"))
 
         self._bg_color = QColor("transparent")
         self._anim = QPropertyAnimation(self, b"bgColor")
@@ -173,27 +174,31 @@ class MainWindow(QMainWindow):
         self.tabs.setTabText(index, title if title else "Новая вкладка")
 
         btn = AnimatedButton()
-        btn.setFixedSize(22, 22)
+        btn.setFixedSize(18, 18)
         btn.setCursor(Qt.CursorShape.PointingHandCursor)
         btn.setStyleSheet("""
             QPushButton {
-                color: #E8EAED;
-                width: 22px;
-                height: 22px;
+                background: transparent;
                 image: url("img/close.png");
                 border-radius: 11px;
             }
             QPushButton:hover {
                 image: url("img/close_active.png");
-                width: 22px;
-                height: 22px;
+                transition: 0.9ms;
             }
         """)
-        btn.clicked.connect(lambda _, i=index: self.close_tab_by_index(i))
 
-        self.tabs.tabBar().setTabButton(
-            index, QTabBar.ButtonPosition.RightSide, btn
-        )
+        # ВАЖНО: закрывать по browser, чтобы при перетаскивании вкладок индекс не ломался
+        btn.clicked.connect(lambda _, b=browser: self.close_tab_by_index(self.tabs.indexOf(b)))
+
+        # ---- контейнер для сдвига кнопки влево ----
+        holder = QWidget()
+        lay = QHBoxLayout(holder)
+        lay.setContentsMargins(0, 0, 8, 0)  # <-- увеличивай 8, чтобы сдвигать ВЛЕВО сильнее
+        lay.setSpacing(0)
+        lay.addWidget(btn)
+
+        self.tabs.tabBar().setTabButton(index, QTabBar.ButtonPosition.RightSide, holder)
 
     def on_url_changed(self, qurl: QUrl, browser: QWebEngineView):
         url = qurl.toString()
@@ -437,6 +442,9 @@ if __name__ == '__main__':
     """
     app = QApplication(sys.argv)
     app.setStyleSheet(StyleBrowser)
+    app.setWindowIcon(QIcon("img/app.ico"))  # ← ВАЖНО
     window = MainWindow()
+    window.setWindowTitle("Google Chrome")
     window.show()
     sys.exit(app.exec())
+
