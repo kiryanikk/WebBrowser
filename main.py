@@ -4,7 +4,7 @@ from PyQt6.QtCore import QUrl, QSize, QPropertyAnimation, QEasingCurve, Qt
 from PyQt6.QtGui import QIcon, QColor
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QTabWidget, QToolBar, QPushButton,
-    QLineEdit, QWidget, QVBoxLayout, QListWidget
+    QLineEdit, QWidget, QVBoxLayout, QListWidget, QTabBar
 )
 from PyQt6.QtWebEngineWidgets import QWebEngineView
 from PyQt6.QtWebEngineCore import QWebEngineProfile, QWebEnginePage
@@ -45,7 +45,7 @@ class AnimatedButton(QPushButton):
     bgColor = property(QColor, get_bg, set_bg)
 
 class MainWindow(QMainWindow):
-    HOME_URL = "https://ya.ru/?utm_referrer=https%3A%2F%2Fwww.google.com%2F"
+    HOME_URL = ("https://www.google.com/")
 
     def __init__(self):
         super().__init__()
@@ -71,12 +71,6 @@ class MainWindow(QMainWindow):
         self.tabs.setElideMode(Qt.TextElideMode.ElideRight)  # обрезать длинные заголовки "..."
         self.tabs.setMovable(True)  # вкладки можно перетаскивать
         self.tabs.setDocumentMode(True)
-        self.tabs.setTabsClosable(True)
-        self.tabs.setStyleSheet(self.tabs.styleSheet() + """
-        QTabBar::close-button { image: url(img/close.png); }
-        """)
-        self.tabs.tabCloseRequested.connect(self.close_tab_by_index)
-        self.tabs.currentChanged.connect(self.on_current_tab_changed)
         self.setCentralWidget(self.tabs)
 
         # ---- Toolbar ----
@@ -171,10 +165,35 @@ class MainWindow(QMainWindow):
 
         return page
 
-    def update_tab_title(self, browser: QWebEngineView, title: str):
+    def update_tab_title(self, browser, title):
         index = self.tabs.indexOf(browser)
-        if index != -1:
-            self.tabs.setTabText(index, title if title else "Новая вкладка")
+        if index == -1:
+            return
+
+        self.tabs.setTabText(index, title if title else "Новая вкладка")
+
+        btn = AnimatedButton()
+        btn.setFixedSize(22, 22)
+        btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn.setStyleSheet("""
+            QPushButton {
+                color: #E8EAED;
+                width: 22px;
+                height: 22px;
+                image: url("img/close.png");
+                border-radius: 11px;
+            }
+            QPushButton:hover {
+                image: url("img/close_active.png");
+                width: 22px;
+                height: 22px;
+            }
+        """)
+        btn.clicked.connect(lambda _, i=index: self.close_tab_by_index(i))
+
+        self.tabs.tabBar().setTabButton(
+            index, QTabBar.ButtonPosition.RightSide, btn
+        )
 
     def on_url_changed(self, qurl: QUrl, browser: QWebEngineView):
         url = qurl.toString()
@@ -287,7 +306,7 @@ if __name__ == '__main__':
 
     /* ====== Toolbar (верхняя панель) ====== */
     QToolBar {
-        background-color: #202124;
+        background-color: #202124; 
         border: none;
         padding: 6px;
         spacing: 6px;
@@ -358,19 +377,19 @@ if __name__ == '__main__':
         color: #E8EAED;
     }
 
-    /* Крестик вкладки */
-    QTabBar::close-button {
-        image: none; /* чтобы не было системной иконки */
-        border: none;
-        border-radius: 8px;
-        min-width: 16px;
-        min-height: 16px;
-        margin-left: 8px;
-    }
-
-    QTabBar::close-button:hover {
-        background: #3C4043;
-    }
+    # /* Крестик вкладки */
+    # QTabBar::close-button {
+    #     image: none;
+    #     border: none;
+    #     border-radius: 8px;
+    #     min-width: 16px;
+    #     min-height: 16px;
+    #     margin-left: 8px;
+    # }
+    # 
+    # QTabBar::close-button:hover {
+    #     background: #3C4043;
+    # }
 
     /* Кнопка закрытия — рисуем "x" текстом (Qt не умеет text тут),
        поэтому оставляем как hover-area; если хочешь иконку — дам вариант ниже. */
