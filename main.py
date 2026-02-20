@@ -53,7 +53,6 @@ class MainWindow(QMainWindow):
         self.resize(1200, 800)
         self.history = []
 
-        # Профиль клиента
         base_dir = os.path.join(os.path.dirname(__file__), "data")
         cache_dir = os.path.join(base_dir, "cache")
         store_dir = os.path.join(base_dir, "storage")
@@ -67,18 +66,14 @@ class MainWindow(QMainWindow):
             QWebEngineProfile.PersistentCookiesPolicy.ForcePersistentCookies
         )
 
-        # ---- Tabs ----
         self.tabs = QTabWidget()
-        self.tabs.setElideMode(Qt.TextElideMode.ElideRight)  # обрезать длинные заголовки "..."
-        self.tabs.setMovable(True)  # вкладки можно перетаскивать
+        self.tabs.setElideMode(Qt.TextElideMode.ElideRight)
+        self.tabs.setMovable(True)
         self.tabs.setDocumentMode(True)
         self.setCentralWidget(self.tabs)
 
-        # ---- Toolbar ----
         self.navbar = QToolBar()
         self.addToolBar(self.navbar)
-
-        # ---- Buttons ----
 
         back_btn = AnimatedButton()
         back_btn.setIcon(QIcon("img/back.png"))
@@ -104,12 +99,10 @@ class MainWindow(QMainWindow):
         home_btn.clicked.connect(self.go_home)
         self.navbar.addWidget(home_btn)
 
-        # ---- URL bar ----
         self.url_bar = QLineEdit()
         self.url_bar.returnPressed.connect(self.navigate_to_url)
         self.navbar.addWidget(self.url_bar)
 
-        # ---- New tab / Close tab / History ----
         newTab_btn = QPushButton("Новая вкладка")
         newTab_btn.clicked.connect(self.open_new_tab)
         self.navbar.addWidget(newTab_btn)
@@ -118,15 +111,10 @@ class MainWindow(QMainWindow):
         history_btn.clicked.connect(self.show_history)
         self.navbar.addWidget(history_btn)
 
-        # ---- Styles (оставил твои) ----
 
-        # ---- First tab ----
         self.add_new_tab(QUrl(self.HOME_URL))
 
 
-    # =========================
-    # Этап 2: add_new_tab
-    # =========================
     def add_new_tab(self, url: QUrl | None = None):
         if url is None:
             url = QUrl(self.HOME_URL)
@@ -188,10 +176,8 @@ class MainWindow(QMainWindow):
             }
         """)
 
-        # ВАЖНО: закрывать по browser, чтобы при перетаскивании вкладок индекс не ломался
         btn.clicked.connect(lambda _, b=browser: self.close_tab_by_index(self.tabs.indexOf(b)))
 
-        # ---- контейнер для сдвига кнопки влево ----
         holder = QWidget()
         lay = QHBoxLayout(holder)
         lay.setContentsMargins(0, 0, 8, 0)  # <-- увеличивай 8, чтобы сдвигать ВЛЕВО сильнее
@@ -203,11 +189,9 @@ class MainWindow(QMainWindow):
     def on_url_changed(self, qurl: QUrl, browser: QWebEngineView):
         url = qurl.toString()
 
-        # обновляем url_bar только если это активная вкладка
         if self.tabs.currentWidget() is browser:
             self.url_bar.setText(url)
 
-        # история без дублей подряд
         if not self.history or self.history[-1] != url:
             self.history.append(url)
 
@@ -218,9 +202,6 @@ class MainWindow(QMainWindow):
         else:
             self.url_bar.setText("")
 
-    # =========================
-    # Навигация
-    # =========================
     def current_browser(self):
         w = self.tabs.currentWidget()
         return w if isinstance(w, QWebEngineView) else None
@@ -258,9 +239,6 @@ class MainWindow(QMainWindow):
         if b:
             b.setUrl(QUrl(text))
 
-    # =========================
-    # История
-    # =========================
     def show_history(self):
         history_widget = QWidget()
         layout = QVBoxLayout(history_widget)
@@ -299,7 +277,6 @@ class Page(QWebEnginePage):
 
 if __name__ == '__main__':
     StyleBrowser = """
-    /* ====== Base ====== */
     QMainWindow {
         background-color: #202124;
     }
@@ -309,7 +286,6 @@ if __name__ == '__main__':
         font-size: 10.5pt;
     }
 
-    /* ====== Toolbar (верхняя панель) ====== */
     QToolBar {
         background-color: #202124; 
         border: none;
@@ -317,7 +293,6 @@ if __name__ == '__main__':
         spacing: 6px;
     }
 
-    /* Кнопки на тулбаре (иконки + текстовые) */
     QToolBar QPushButton {
         background-color: transparent;
         border: none;
@@ -334,7 +309,6 @@ if __name__ == '__main__':
         background-color: #3C4043;
     }
 
-    /* Адресная строка - "pill" */
     QToolBar QLineEdit {
         background-color: #303134;
         border: 1px solid #303134;
@@ -350,13 +324,11 @@ if __name__ == '__main__':
         border: 1px solid #8AB4F8;
     }
 
-    /* ====== Tabs ====== */
     QTabWidget::pane {
         border: none;
         background: #202124;
     }
 
-    /* Полоса вкладок */
     QTabBar {
         background: #202124;
     }
@@ -381,25 +353,7 @@ if __name__ == '__main__':
         background: #303134;
         color: #E8EAED;
     }
-
-    # /* Крестик вкладки */
-    # QTabBar::close-button {
-    #     image: none;
-    #     border: none;
-    #     border-radius: 8px;
-    #     min-width: 16px;
-    #     min-height: 16px;
-    #     margin-left: 8px;
-    # }
-    # 
-    # QTabBar::close-button:hover {
-    #     background: #3C4043;
-    # }
-
-    /* Кнопка закрытия — рисуем "x" текстом (Qt не умеет text тут),
-       поэтому оставляем как hover-area; если хочешь иконку — дам вариант ниже. */
-
-    /* ====== Scrollbar (чуть ближе к Chrome) ====== */
+    
     QScrollBar:vertical {
         background: #202124;
         width: 12px;
